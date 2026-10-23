@@ -1,0 +1,92 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-observability
+  labels:
+    app.kubernetes.io/part-of: opencost-ai-demo
+    team: platform-engineering
+    opencost.io/team: platform-engineering
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-metrics-service
+  namespace: ai-observability
+  labels:
+    app.kubernetes.io/name: ai-metrics-service
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/part-of: opencost-ai-demo
+    team: platform-engineering
+    opencost.io/team: platform-engineering
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-metrics-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-metrics-service
+        app.kubernetes.io/component: observability
+        app.kubernetes.io/part-of: opencost-ai-demo
+        team: platform-engineering
+        opencost.io/team: platform-engineering
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: ai-metrics-service
+          image: ai-metrics-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-metrics-service
+  namespace: ai-observability
+  labels:
+    app.kubernetes.io/name: ai-metrics-service
+    app.kubernetes.io/part-of: opencost-ai-demo
+    team: platform-engineering
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: /metrics
+    prometheus.io/port: "http"
+spec:
+  selector:
+    app.kubernetes.io/name: ai-metrics-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

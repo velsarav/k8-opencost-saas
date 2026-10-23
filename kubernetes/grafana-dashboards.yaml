@@ -1,0 +1,202 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/part-of: opencost-ai-demo
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-service-usage-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/name: ai-service-usage-dashboard
+    app.kubernetes.io/part-of: opencost-ai-demo
+data:
+  ai-service-usage.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "cores"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "title": "CPU usage by service",
+          "targets": [
+            {
+              "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",container!=\"\",image!=\"\"}[5m]))",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "title": "Memory working set by service",
+          "targets": [
+            {
+              "expr": "sum by (namespace) (container_memory_working_set_bytes{namespace=~\"$namespace\",container!=\"\",image!=\"\"})",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "cores"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "id": 3,
+          "title": "OpenCost CPU allocation (requested cores)",
+          "targets": [
+            {
+              "expr": "sum by (namespace) (container_cpu_allocation{namespace=~\"$namespace\",container!=\"POD\"})",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "id": 4,
+          "title": "OpenCost memory allocation (requested)",
+          "targets": [
+            {
+              "expr": "sum by (namespace) (container_memory_allocation_bytes{namespace=~\"$namespace\",container!=\"POD\"})",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ],
+          "type": "timeseries"
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["opencost", "ai-services", "usage"],
+      "templating": {
+        "list": [
+          {
+            "current": {"selected": true, "text": "All", "value": "$__all"},
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "includeAll": true,
+            "multi": true,
+            "name": "namespace",
+            "query": "label_values(container_cpu_allocation{namespace=~\"customer-chat|document-ai|vision-ai\"}, namespace)",
+            "refresh": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": {"from": "now-6h", "to": "now"},
+      "title": "AI Service Usage",
+      "uid": "ai-service-usage",
+      "version": 1
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-service-cost-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/name: ai-service-cost-dashboard
+    app.kubernetes.io/part-of: opencost-ai-demo
+data:
+  ai-service-cost.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "currencyUSD"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "options": {"legend": {"displayMode": "table", "placement": "right"}},
+          "title": "Estimated monthly cost by service",
+          "targets": [
+            {
+              "expr": "sum by (namespace) ((container_cpu_allocation{namespace=~\"$namespace\",container!=\"POD\"} * on (node) group_left node_cpu_hourly_cost) + (container_memory_allocation_bytes{namespace=~\"$namespace\",container!=\"POD\"} * on (node) group_left node_ram_hourly_cost / (1024 * 1024 * 1024))) * 730",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "currencyUSD"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "options": {
+            "displayLabels": ["name", "value"],
+            "legend": {"displayMode": "list", "placement": "right"},
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+          },
+          "title": "Monthly cost allocation",
+          "targets": [
+            {
+              "expr": "sum by (namespace) ((container_cpu_allocation{namespace=~\"$namespace\",container!=\"POD\"} * on (node) group_left node_cpu_hourly_cost) + (container_memory_allocation_bytes{namespace=~\"$namespace\",container!=\"POD\"} * on (node) group_left node_ram_hourly_cost / (1024 * 1024 * 1024))) * 730",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ],
+          "type": "piechart"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "currencyUSD"}, "overrides": []},
+          "gridPos": {"h": 9, "w": 24, "x": 0, "y": 8},
+          "id": 3,
+          "options": {"showHeader": true},
+          "title": "Hourly cost by service and pod",
+          "targets": [
+            {
+              "expr": "sum by (namespace, pod) ((container_cpu_allocation{namespace=~\"$namespace\",container!=\"POD\"} * on (node) group_left node_cpu_hourly_cost) + (container_memory_allocation_bytes{namespace=~\"$namespace\",container!=\"POD\"} * on (node) group_left node_ram_hourly_cost / (1024 * 1024 * 1024)))",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {"excludeByName": {"Time": true}, "indexByName": {}, "renameByName": {"Value": "Hourly cost (USD)"}}
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["opencost", "ai-services", "cost"],
+      "templating": {
+        "list": [
+          {
+            "current": {"selected": true, "text": "All", "value": "$__all"},
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "includeAll": true,
+            "multi": true,
+            "name": "namespace",
+            "query": "label_values(container_cpu_allocation{namespace=~\"customer-chat|document-ai|vision-ai\"}, namespace)",
+            "refresh": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": {"from": "now-24h", "to": "now"},
+      "title": "AI Service Cost Allocation",
+      "uid": "ai-service-cost",
+      "version": 1
+    }

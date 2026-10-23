@@ -1,0 +1,55 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: load-testing
+  labels:
+    app.kubernetes.io/part-of: opencost-ai-demo
+    team: platform-engineering
+    opencost.io/team: platform-engineering
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ai-service-load-generator
+  namespace: load-testing
+  labels:
+    app.kubernetes.io/name: ai-service-load-generator
+    app.kubernetes.io/component: load-generator
+    app.kubernetes.io/part-of: opencost-ai-demo
+    team: platform-engineering
+    opencost.io/team: platform-engineering
+spec:
+  restartPolicy: Always
+  containers:
+    - name: load-generator
+      image: curlimages/curl:8.10.1
+      command:
+        - /bin/sh
+        - -ec
+        - |
+          while true; do
+            for target in \
+              http://customer-chat.customer-chat.svc.cluster.local \
+              http://vision-ai.vision-ai.svc.cluster.local; do
+              curl --fail --silent --show-error --output /dev/null \
+                --connect-timeout 2 --max-time 5 "${target}" || true
+            done
+            sleep 1
+          done
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 128Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
